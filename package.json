@@ -1,0 +1,34 @@
+{
+  "name": "express-php-middleware",
+  "version": "1.1.0",
+  "description": "Simple express middleware for serving PHP files",
+  "author": "Robert Liapota <urobbyu@gmail.com>",
+  "repository": "UROBBYU/express-php-middleware",
+  "license": "MIT",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "dependencies": {
+    "command-exists": "^1.2.9",
+    "express": "^4.17.3",
+    "type-is": "^1.6.18"
+  },
+  "optionalDependencies": {
+    "@types/command-exists": "^1.2.0",
+    "@types/express": "^4.17.13",
+    "@types/type-is": "^1.6.3"
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "index.js",
+    "index.d.ts"
+  ],
+  "keywords": [
+    "php",
+    "express",
+    "middleware",
+    "router",
+    "web",
+    "server"
+  ]
+}
