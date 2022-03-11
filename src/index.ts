@@ -375,7 +375,7 @@ const compile: Compile = (arg: string | Options) => {
                 else if (req.body instanceof Buffer) body = req.body
                 else if (typeof req.body === 'object' && Object.getOwnPropertyNames(req.body).length) {
                     if (typeis(req, 'urlencoded')) {
-                        body = Buffer.from(encodeURI(Object.entries(req.body).map(val => `${val[0]}=${encodeURIComponent((<number | string>val[1]).toString())}`).join('&')))
+                        body = Buffer.from(Object.entries(req.body).map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(<number | string>v)).join('&').replace(/%20/g, '+'))
                     } else {
                         body = Buffer.from(JSON.stringify(req.body))
                         CONTENT_TYPE = 'application/json'

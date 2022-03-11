@@ -36,7 +36,7 @@ module.exports = arg => {
                 else if (req.body instanceof Buffer) body = req.body;
                 else if (typeof req.body === 'object' && Object.getOwnPropertyNames(req.body).length) {
                     if (typeis(req, 'urlencoded')) {
-                        body = Buffer.from(encodeURI(Object.entries(req.body).map(val => `${val[0]}=${encodeURIComponent(val[1].toString())}`).join('&')));
+                        body = Buffer.from(Object.entries(req.body).map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&').replace(/%20/g, '+'));
                     }
                     else {
                         body = Buffer.from(JSON.stringify(req.body));
