@@ -4,7 +4,7 @@
 [![install size](https://badgen.net/packagephobia/install/express-php-middleware?color=yellow&icon=packagephobia)](https://packagephobia.com/result?p=express-php-middleware)
 ![types](https://badgen.net/npm/types/express-php-middleware?color=green&icon=typescript)
 
-This module uses PHP CGI to compile file output. It also accepts parsed request bodies and returns body with headers.
+This module uses PHP CGI to compile file output. It also accepts parsed request bodies and returns body with headers. Cookies and custom headers are also supported.
 
 ## Installation
 

@@ -1,10 +1,6 @@
 /// <reference types="node" />
-
-
 import fs = require('fs');
 import express = require('express');
-
-
 interface Environment {
     /**
      * For security reasons, by default CGI compiler blocks all direct executions. To execute it properly request must be redirected by server. Redirect status is the request status passed to PHP compiler. Similarly to Express, 200 is 'OK', 404 - 'Not Found' and 500 - 'Internal Server Error'.
@@ -43,39 +39,11 @@ interface Environment {
      */
     HTTPS?: string;
     /**
-     * Just like CONTENT_TYPE provides the data or MIME type that is delivered, the HTTP_ACCEPT lists all the possible MIME types that a client making the request can accept. The list of types is separated by commas.
+     * All headers from the request. Must be in format: `'Some-Custom-Header': 'And some data here'`. Headers's name case does not matter.
      *
      * **Evaluated automatically.**
      */
-    HTTP_ACCEPT?: string;
-    /**
-     * Contents of the Accept-Charset: header from the current request, if there is one.
-     *
-     * Example: 'iso-8859-1,*,utf-8'.
-     *
-     * **Evaluated automatically.**
-     */
-    HTTP_ACCEPT_CHARSET?: string;
-    /**
-     * Contents of the Accept-Encoding: header from the current request, if there is one.
-     *
-     * Example: 'gzip'.
-     *
-     * **Evaluated automatically.**
-     */
-    HTTP_ACCEPT_ENCODING?: string;
-    /**
-     * The address of the page (if any) which referred the user agent to the current page. This is set by the user agent.
-     *
-     * **Evaluated automatically.**
-     */
-    HTTP_REFERER?: string;
-    /**
-     * The HTTP_USER_AGENT gives the name of the program that a client uses to send the request. For example, if a user executes a CGI script from Mozilla Firefox, the HTTP_USER_AGENT would indicate that the user made a request to the web server through Firefox.
-     *
-     * **Evaluated automatically.**
-     */
-    HTTP_USER_AGENT?: string;
+    [key: `HTTP_${Uppercase<string>}`]: string;
     /**
      * The PATH_INFO variable contains additional information that is seen after the CGI script name. For example, if you execute www.placeholder.com/cgi-bin/hello.pl/index.html, then the PATH_INFO for this would be the characters that come after the CGI script name or /index.html in this example.
      *
@@ -155,9 +123,7 @@ interface Environment {
      */
     SERVER_SOFTWARE?: string;
 }
-
-
-type Options = {
+declare type Options = {
     /**
      * Environment variables that will be passed to the PHP compiler. Some of them are just description of request, others are special arguments which dictate compiler's behavior.
      *
@@ -195,12 +161,10 @@ type Options = {
      */
     timeout?: number;
 };
-
-
 /**
  * Response from the PHP compiler.
  */
-type PHPData = {
+declare type PHPData = {
     /**
      * All HTTP headers.
      *
@@ -243,9 +207,7 @@ type PHPData = {
      */
     raw: string;
 };
-
-
-type Execute = {
+declare type Execute = {
     /**
      * Request handler.
      *
@@ -272,9 +234,7 @@ type Execute = {
      */
     (/** - Express' request object. */ request: express.Request, /** - Express' response object. */ response: express.Response): Promise<PHPData>;
 };
-
-
-type Compile = {
+declare type Compile = {
     /**
      * Creates a PHP compiler process.
      *
@@ -324,9 +284,5 @@ type Compile = {
      */
     (/** - Compilation options. `file` property must be specified. */ options: Options): Execute;
 };
-
-
 declare const compile: Compile;
-
-
 export = compile;

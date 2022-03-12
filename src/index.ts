@@ -9,7 +9,6 @@ import fs = require('fs')
 import child = require('child_process')
 import path = require('path')
 import express = require('express')
-import typeis = require('type-is')
 import cmdEx from 'command-exists'
 
 
@@ -54,46 +53,14 @@ interface Environment {
      * 
      * **Evaluated automatically.**
      */
-     HTTPS?: string;
+    HTTPS?: string;
 
     /**
-     * Just like CONTENT_TYPE provides the data or MIME type that is delivered, the HTTP_ACCEPT lists all the possible MIME types that a client making the request can accept. The list of types is separated by commas.
+     * All headers from the request. Must be in format: `'Some-Custom-Header': 'And some data here'`. Headers's name case does not matter.
      * 
      * **Evaluated automatically.**
      */
-    HTTP_ACCEPT?: string;
-
-    /**
-     * Contents of the Accept-Charset: header from the current request, if there is one.
-     * 
-     * Example: 'iso-8859-1,*,utf-8'.
-     * 
-     * **Evaluated automatically.**
-     */
-    HTTP_ACCEPT_CHARSET?: string;
-
-    /**
-     * Contents of the Accept-Encoding: header from the current request, if there is one.
-     * 
-     * Example: 'gzip'.
-     * 
-     * **Evaluated automatically.**
-     */
-    HTTP_ACCEPT_ENCODING?: string;
-
-    /**
-     * The address of the page (if any) which referred the user agent to the current page. This is set by the user agent.
-     * 
-     * **Evaluated automatically.**
-     */
-    HTTP_REFERER?: string;
-
-    /**
-     * The HTTP_USER_AGENT gives the name of the program that a client uses to send the request. For example, if a user executes a CGI script from Mozilla Firefox, the HTTP_USER_AGENT would indicate that the user made a request to the web server through Firefox.
-     * 
-     * **Evaluated automatically.**
-     */
-    HTTP_USER_AGENT?: string;
+    [key: `HTTP_${Uppercase<string>}`]: string;
 
     /**
      * The PATH_INFO variable contains additional information that is seen after the CGI script name. For example, if you execute www.placeholder.com/cgi-bin/hello.pl/index.html, then the PATH_INFO for this would be the characters that come after the CGI script name or /index.html in this example.
@@ -374,7 +341,7 @@ const compile: Compile = (arg: string | Options) => {
                 if (typeof req.body === 'string') body = Buffer.from(req.body)
                 else if (req.body instanceof Buffer) body = req.body
                 else if (typeof req.body === 'object' && Object.getOwnPropertyNames(req.body).length) {
-                    if (typeis(req, 'urlencoded')) {
+                    if (req.is('application/x-www-form-urlencoded')) {
                         body = Buffer.from(Object.entries(req.body).map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(<number | string>v)).join('&').replace(/%20/g, '+'))
                     } else {
                         body = Buffer.from(JSON.stringify(req.body))
@@ -384,37 +351,46 @@ const compile: Compile = (arg: string | Options) => {
                 }
             }
 
+            const env = {
+                SCRIPT_FILENAME: file.toString(),
+                REDIRECT_STATUS: (<Options>arg).env?.REDIRECT_STATUS?.toString() ?? '200',
+                AUTH_TYPE: (<Options>arg).env?.AUTH_TYPE,
+                CONTENT_LENGTH: (<Options>arg).env?.CONTENT_LENGTH?.toString() ?? CONTENT_LENGTH,
+                CONTENT_TYPE: (<Options>arg).env?.CONTENT_TYPE ?? CONTENT_TYPE,
+                GATEWAY_INTERFACE: (<Options>arg).env?.GATEWAY_INTERFACE ?? 'CGI/1.1',
+                HTTPS: (<Options>arg).env?.HTTPS ?? (req.secure ? 'On' : undefined),
+                PATH_INFO: (<Options>arg).env?.PATH_INFO ?? req.path,
+                PATH_TRANSLATED: (<Options>arg).env?.PATH_TRANSLATED ?? file.toString(),
+                QUERY_STRING: encodeURI(Object.entries(req.query).map(val => `${val[0]}=${encodeURIComponent((<number | string>val[1]).toString())}`).join('&')),
+                REMOTE_ADDR: (<Options>arg).env?.REMOTE_ADDR ?? req.get('CF-Connecting-IP') ?? req.ip,
+                REMOTE_HOST: (<Options>arg).env?.REMOTE_HOST,
+                REMOTE_IDENT: (<Options>arg).env?.REMOTE_IDENT,
+                REMOTE_USER: (<Options>arg).env?.REMOTE_USER,
+                REQUEST_METHOD: (<Options>arg).env?.REQUEST_METHOD ?? req.method,
+                SERVER_ADDR: (<Options>arg).env?.SERVER_ADDR ?? req.socket.localAddress,
+                SERVER_NAME: (<Options>arg).env?.SERVER_NAME ?? req.hostname,
+                SERVER_PORT: (<Options>arg).env?.SERVER_PORT?.toString() ?? req.socket.localPort?.toString(),
+                SERVER_PROTOCOL: (<Options>arg).env?.SERVER_PROTOCOL ?? ('HTTP/' + req.httpVersion),
+                SERVER_SOFTWARE: (<Options>arg).env?.SERVER_SOFTWARE ?? 'Express'
+            }
+
+            const headers: {[i:string]:string} = {}
+
+            for (const name in req.headers) {
+                let header = req.headers[name]
+
+                if (typeof header === 'object' || header === undefined) continue
+
+                headers['HTTP_' + name.toUpperCase().replace(/-/g, '_')] = header
+            }
+
+            Object.assign(env, headers)
+
             const proc = child.spawn(php, {
                 cwd: (<Options>arg).cwd?.toString(),
                 signal: (<Options>arg).abort,
                 timeout: (<Options>arg).timeout ?? 0,
-                env: {
-                    SCRIPT_FILENAME: file.toString(),
-                    REDIRECT_STATUS: (<Options>arg).env?.REDIRECT_STATUS?.toString() ?? '200',
-                    AUTH_TYPE: (<Options>arg).env?.AUTH_TYPE,
-                    CONTENT_LENGTH: (<Options>arg).env?.CONTENT_LENGTH?.toString() ?? CONTENT_LENGTH,
-                    CONTENT_TYPE: (<Options>arg).env?.CONTENT_TYPE ?? CONTENT_TYPE,
-                    GATEWAY_INTERFACE: (<Options>arg).env?.GATEWAY_INTERFACE ?? 'CGI/1.1',
-                    HTTPS: (<Options>arg).env?.HTTPS ?? (req.secure ? 'On' : undefined),
-                    HTTP_ACCEPT: (<Options>arg).env?.HTTP_ACCEPT ?? req.headers.accept,
-                    HTTP_ACCEPT_CHARSET: (<Options>arg).env?.HTTP_ACCEPT_CHARSET ?? req.get('Accept-Charset') ?? 'utf-8',
-                    HTTP_ACCEPT_ENCODING: (<Options>arg).env?.HTTP_ACCEPT_ENCODING ?? req.get('Accept-Encoding'),
-                    HTTP_REFERER: (<Options>arg).env?.HTTP_REFERER ?? req.headers.referer,
-                    HTTP_USER_AGENT: (<Options>arg).env?.HTTP_USER_AGENT ?? req.get('User-Agent'),
-                    PATH_INFO: (<Options>arg).env?.PATH_INFO ?? req.path,
-                    PATH_TRANSLATED: (<Options>arg).env?.PATH_TRANSLATED ?? file.toString(),
-                    QUERY_STRING: encodeURI(Object.entries(req.query).map(val => `${val[0]}=${encodeURIComponent((<number | string>val[1]).toString())}`).join('&')),
-                    REMOTE_ADDR: (<Options>arg).env?.REMOTE_ADDR ?? req.get('CF-Connecting-IP') ?? req.ip,
-                    REMOTE_HOST: (<Options>arg).env?.REMOTE_HOST,
-                    REMOTE_IDENT: (<Options>arg).env?.REMOTE_IDENT,
-                    REMOTE_USER: (<Options>arg).env?.REMOTE_USER,
-                    REQUEST_METHOD: (<Options>arg).env?.REQUEST_METHOD ?? req.method,
-                    SERVER_ADDR: (<Options>arg).env?.SERVER_ADDR ?? req.socket.localAddress,
-                    SERVER_NAME: (<Options>arg).env?.SERVER_NAME ?? req.hostname,
-                    SERVER_PORT: (<Options>arg).env?.SERVER_PORT?.toString() ?? req.socket.localPort?.toString(),
-                    SERVER_PROTOCOL: (<Options>arg).env?.SERVER_PROTOCOL ?? ('HTTP/' + req.httpVersion),
-                    SERVER_SOFTWARE: (<Options>arg).env?.SERVER_SOFTWARE ?? 'Express'
-                }
+                env
             })
             
             proc.stdout.setEncoding('utf-8')
