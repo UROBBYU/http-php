@@ -1,8 +1,8 @@
-# Express PHP Middleware
+# HTTP ⇆ PHP Middleware
 
-[![version](https://badgen.net/npm/v/express-php-middleware?label=version&icon=npm)](https://www.npmjs.com/package/express-php-middleware)
-[![install size](https://badgen.net/packagephobia/install/express-php-middleware?color=yellow&icon=packagephobia)](https://packagephobia.com/result?p=express-php-middleware)
-![types](https://badgen.net/npm/types/express-php-middleware?color=green&icon=typescript)
+[![version](https://badgen.net/npm/v/http-php?label=version&icon=npm)](https://www.npmjs.com/package/http-php)
+[![install size](https://badgen.net/packagephobia/install/http-php?color=yellow&icon=packagephobia)](https://packagephobia.com/result?p=http-php)
+![types](https://badgen.net/npm/types/http-php?color=green&icon=typescript)
 
 This module uses PHP CGI to compile file output. It also accepts parsed request bodies and returns body with headers. Cookies and custom headers are also supported.
 
@@ -11,17 +11,17 @@ This module uses PHP CGI to compile file output. It also accepts parsed request 
 You can install it with [npm](https://www.npmjs.com/):
 
 ```
-npm i express-php-middleware
+npm i http-php
 ```
 
-You also need PHP to be already [installed](https://www.php.net/install) and [configured](https://www.php.net/manual/en/faq.installation.php#faq.installation.addtopath) in the `PATH`.
+You also need PHP to be already [installed](https://www.php.net/install) and preferably [configured](https://www.php.net/manual/en/faq.installation.php#faq.installation.addtopath) in the `PATH`.
 
 ## Usage
 
 First of all, add module with:
 
 ```js
-const php = require('express-php-middleware');
+const php = require('http-php');
 ```
 
 Then, create file compiler:
@@ -53,11 +53,7 @@ Compiler accepts `request` and optionally `response` parameters and returns comp
 ### Full example of express server with `/path` as a PHP route:
 
 ```js
-const express = require('express');
-const app = express();
-const php = require('express-php-middleware');
-
-const file_php = php({
+const file_php = require('http-php')({
     file: 'path/to/file.php',
     timeout: 1000,
     env: {
@@ -65,25 +61,32 @@ const file_php = php({
     }
 });
 
-app.get('/path', async (req, res, next) => {
+require('express')
+.get('/path', async (req, res, next) => {
     let { body: page } = await file_php(req).catch(next); // Returns compiler output as a string
     // Do something with page
     page = page.replace('<title>Old Title</title>', '<title>New Title</title>');
     res.send(page);
-});
-
-app.listen(80);
+})
+.listen(80);
 ```
 
 You can also simplify router declaration by one-lining it:
 
 ```js
-const express = require('express');
-const app = express();
-
-app.get('/path', require('express-php-middleware')('path/to/file.php'));
-
-app.listen(80);
+require('express')()
+.get('/path', require('http-php')('path/to/file.php'))
+.listen(80);
 ```
 
 This shortcut is useful when you don't need to change content of the compiled page.
+
+### It also works for basic HTTP server:
+
+```js
+require('http')
+.createServer(require('http-php')('path/to/file.php'))
+.listen(80);
+```
+
+*Same for HTTPS*.

@@ -22,10 +22,10 @@ const compile = (arg) => {
         throw new Error('PHP file path is incorrect {options->file | path}');
     return (req, res) => {
         return new Promise((resolve, reject) => {
-            let CONTENT_TYPE = req.get('Content-Type');
-            let CONTENT_LENGTH = req.get('Content-Length');
+            let CONTENT_TYPE = req.headers['content-type'];
+            let CONTENT_LENGTH = req.headers['content-length'];
             let body = null;
-            if (!req.readable) {
+            if (!req.readable && 'body' in req) {
                 if (typeof req.body === 'string')
                     body = Buffer.from(req.body);
                 else if (req.body instanceof Buffer)
@@ -48,17 +48,17 @@ const compile = (arg) => {
                 CONTENT_LENGTH: arg.env?.CONTENT_LENGTH?.toString() ?? CONTENT_LENGTH,
                 CONTENT_TYPE: arg.env?.CONTENT_TYPE ?? CONTENT_TYPE,
                 GATEWAY_INTERFACE: arg.env?.GATEWAY_INTERFACE ?? 'CGI/1.1',
-                HTTPS: arg.env?.HTTPS ?? (req.secure ? 'On' : undefined),
-                PATH_INFO: arg.env?.PATH_INFO ?? req.path,
+                HTTPS: arg.env?.HTTPS ?? ('encrypted' in req.socket ? 'On' : undefined),
+                PATH_INFO: arg.env?.PATH_INFO ?? req.url?.replace(/\?.*?/, ''),
                 PATH_TRANSLATED: arg.env?.PATH_TRANSLATED ?? file.toString(),
-                QUERY_STRING: encodeURI(Object.entries(req.query).map(val => `${val[0]}=${encodeURIComponent(val[1].toString())}`).join('&')),
-                REMOTE_ADDR: arg.env?.REMOTE_ADDR ?? req.get('CF-Connecting-IP') ?? req.ip,
+                QUERY_STRING: req.url?.includes('?') ? req.url?.replace(/.*?\?/, '') : '',
+                REMOTE_ADDR: arg.env?.REMOTE_ADDR ?? req.headers['cf-connecting-ip'] ?? req.headers.forwarded?.split(',')[0],
                 REMOTE_HOST: arg.env?.REMOTE_HOST,
                 REMOTE_IDENT: arg.env?.REMOTE_IDENT,
                 REMOTE_USER: arg.env?.REMOTE_USER,
                 REQUEST_METHOD: arg.env?.REQUEST_METHOD ?? req.method,
                 SERVER_ADDR: arg.env?.SERVER_ADDR ?? req.socket.localAddress,
-                SERVER_NAME: arg.env?.SERVER_NAME ?? req.hostname,
+                SERVER_NAME: arg.env?.SERVER_NAME ?? req.headers.host,
                 SERVER_PORT: arg.env?.SERVER_PORT?.toString() ?? req.socket.localPort?.toString(),
                 SERVER_PROTOCOL: arg.env?.SERVER_PROTOCOL ?? ('HTTP/' + req.httpVersion),
                 SERVER_SOFTWARE: arg.env?.SERVER_SOFTWARE ?? 'Express'
@@ -94,9 +94,9 @@ const compile = (arg) => {
                         const code = +headers['Status'].split(' ')[0];
                         if (code == 500)
                             return reject(new Error('Failed to compile PHP file'));
-                        res.status(code);
+                        res.statusCode = code;
                     }
-                    res.set(headers).send(body);
+                    res.writeHead(200, headers).end(body);
                 }
                 resolve({ headers, body, raw });
             });

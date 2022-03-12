@@ -1,9 +1,9 @@
 {
-  "name": "express-php-middleware",
-  "version": "1.2.1",
-  "description": "Simple express middleware for serving PHP files",
+  "name": "http-php",
+  "version": "1.2.2",
+  "description": "Simple http middleware for serving PHP files",
   "author": "Robert Liapota <urobbyu@gmail.com>",
-  "repository": "UROBBYU/express-php-middleware",
+  "repository": "UROBBYU/http-php",
   "license": "MIT",
   "main": "index.js",
   "types": "index.d.ts",
@@ -26,14 +26,19 @@
     "README.md",
     "LICENSE",
     "index.js",
-    "index.d.ts"
+    "index.d.ts",
+    "test"
   ],
   "keywords": [
     "php",
     "express",
     "middleware",
-    "router",
     "web",
-    "server"
-  ]
+    "server",
+    "http"
+  ],
+  "scripts": {
+    "test": "node test/http.js",
+    "test-ex": "node test/express.js"
+  }
 }

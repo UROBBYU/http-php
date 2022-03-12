@@ -7,6 +7,7 @@
 
 import fs = require('fs')
 import child = require('child_process')
+import http = require('http')
 import path = require('path')
 import express = require('express')
 import cmdEx from 'command-exists'
@@ -332,12 +333,13 @@ const compile: Compile = (arg: string | Options) => {
 
     if (!file || !fs.existsSync(file)) throw new Error('PHP file path is incorrect {options->file | path}')
 
-    return (req: express.Request, res?: express.Response): Promise<PHPData> => {
+    return (req: http.IncomingMessage | express.Request, res?: http.ServerResponse): Promise<PHPData> => {
+        
         return new Promise((resolve, reject) => {
-            let CONTENT_TYPE = req.get('Content-Type')
-            let CONTENT_LENGTH = req.get('Content-Length')
+            let CONTENT_TYPE = <string>req.headers['content-type']
+            let CONTENT_LENGTH = <string>req.headers['content-length']
             let body: (Buffer | null) = null
-            if (!req.readable) {
+            if (!req.readable && 'body' in req) {
                 if (typeof req.body === 'string') body = Buffer.from(req.body)
                 else if (req.body instanceof Buffer) body = req.body
                 else if (typeof req.body === 'object' && Object.getOwnPropertyNames(req.body).length) {
@@ -358,17 +360,17 @@ const compile: Compile = (arg: string | Options) => {
                 CONTENT_LENGTH: (<Options>arg).env?.CONTENT_LENGTH?.toString() ?? CONTENT_LENGTH,
                 CONTENT_TYPE: (<Options>arg).env?.CONTENT_TYPE ?? CONTENT_TYPE,
                 GATEWAY_INTERFACE: (<Options>arg).env?.GATEWAY_INTERFACE ?? 'CGI/1.1',
-                HTTPS: (<Options>arg).env?.HTTPS ?? (req.secure ? 'On' : undefined),
-                PATH_INFO: (<Options>arg).env?.PATH_INFO ?? req.path,
+                HTTPS: (<Options>arg).env?.HTTPS ?? ('encrypted' in req.socket ? 'On' : undefined),
+                PATH_INFO: (<Options>arg).env?.PATH_INFO ?? req.url?.replace(/\?.*?/, ''),
                 PATH_TRANSLATED: (<Options>arg).env?.PATH_TRANSLATED ?? file.toString(),
-                QUERY_STRING: encodeURI(Object.entries(req.query).map(val => `${val[0]}=${encodeURIComponent((<number | string>val[1]).toString())}`).join('&')),
-                REMOTE_ADDR: (<Options>arg).env?.REMOTE_ADDR ?? req.get('CF-Connecting-IP') ?? req.ip,
+                QUERY_STRING: req.url?.includes('?') ? req.url?.replace(/.*?\?/, '') : '',
+                REMOTE_ADDR: (<Options>arg).env?.REMOTE_ADDR ?? <string>req.headers['cf-connecting-ip'] ?? req.headers.forwarded?.split(',')[0],
                 REMOTE_HOST: (<Options>arg).env?.REMOTE_HOST,
                 REMOTE_IDENT: (<Options>arg).env?.REMOTE_IDENT,
                 REMOTE_USER: (<Options>arg).env?.REMOTE_USER,
                 REQUEST_METHOD: (<Options>arg).env?.REQUEST_METHOD ?? req.method,
                 SERVER_ADDR: (<Options>arg).env?.SERVER_ADDR ?? req.socket.localAddress,
-                SERVER_NAME: (<Options>arg).env?.SERVER_NAME ?? req.hostname,
+                SERVER_NAME: (<Options>arg).env?.SERVER_NAME ?? req.headers.host,
                 SERVER_PORT: (<Options>arg).env?.SERVER_PORT?.toString() ?? req.socket.localPort?.toString(),
                 SERVER_PROTOCOL: (<Options>arg).env?.SERVER_PROTOCOL ?? ('HTTP/' + req.httpVersion),
                 SERVER_SOFTWARE: (<Options>arg).env?.SERVER_SOFTWARE ?? 'Express'
@@ -411,9 +413,9 @@ const compile: Compile = (arg: string | Options) => {
                     if (headers['Status']) {
                         const code = +headers['Status'].split(' ')[0]
                         if (code == 500) return reject(new Error('Failed to compile PHP file'))
-                        res.status(code)
+                        res.statusCode = code
                     }
-                    res.set(headers).send(body)
+                    res.writeHead(200, headers).end(body)
                 }
                 resolve({ headers, body, raw })
             })
