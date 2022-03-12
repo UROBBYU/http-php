@@ -71,6 +71,10 @@ const compile = (arg) => {
                 headers['HTTP_' + name.toUpperCase().replace(/-/g, '_')] = header;
             }
             Object.assign(env, headers);
+            for (const name in arg.env) {
+                if (name.startsWith('HTTP_'))
+                    env[name] = arg.env?.[name];
+            }
             const proc = child.spawn(php, {
                 cwd: arg.cwd?.toString(),
                 signal: arg.abort,

@@ -1,6 +1,6 @@
 {
   "name": "express-php-middleware",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Simple express middleware for serving PHP files",
   "author": "Robert Liapota <urobbyu@gmail.com>",
   "repository": "UROBBYU/express-php-middleware",

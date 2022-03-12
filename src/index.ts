@@ -386,6 +386,10 @@ const compile: Compile = (arg: string | Options) => {
 
             Object.assign(env, headers)
 
+            for (const name in (<Options>arg).env) {
+                if (name.startsWith('HTTP_')) env[<'HTTPS'>name] = (<Options>arg).env?.[<'HTTPS'>name]
+            }
+
             const proc = child.spawn(php, {
                 cwd: (<Options>arg).cwd?.toString(),
                 signal: (<Options>arg).abort,
