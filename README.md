@@ -62,7 +62,7 @@ const file_php = require('http-php')({
 });
 
 require('express')
-.get('/path', async (req, res, next) => {
+.all('/path', async (req, res, next) => {
     let { body: page } = await file_php(req).catch(next); // Returns compiler output as a string
     // Do something with page
     page = page.replace('<title>Old Title</title>', '<title>New Title</title>');
@@ -75,7 +75,7 @@ You can also simplify router declaration by one-lining it:
 
 ```js
 require('express')()
-.get('/path', require('http-php')('path/to/file.php'))
+.all('/path', require('http-php')('path/to/file.php'))
 .listen(80);
 ```
 

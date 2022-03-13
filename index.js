@@ -1,5 +1,5 @@
 "use strict";
-// NPM Module 'express-php-middleware'
+// NPM Module 'http-php'
 //
 // Simple express middleware for serving PHP files.
 //

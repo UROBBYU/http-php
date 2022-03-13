@@ -1,4 +1,4 @@
-// NPM Module 'express-php-middleware'
+// NPM Module 'http-php'
 //
 // Simple express middleware for serving PHP files.
 //
@@ -247,10 +247,10 @@ type Execute = {
      * 
      * ### Example:
      * ```js
-     * const php_cmd = require('express-php-middleware');
+     * const php_cmd = require('http-php');
      * const file_php = php_cmd('path/to/file.php');
      * 
-     * app.get('/path', async (req, res) => {
+     * app.all('/path', async (req, res) => {
      *    let { body: page } = await file_php(req);
      *    // Do something with page
      *    res.send(page);
@@ -264,7 +264,7 @@ type Execute = {
      * 
      * ### Example:
      * ```js
-     * app.post('/path', require('express-php-middleware')('path/to/file.php'));
+     * app.all('/path', require('http-php')('path/to/file.php'));
      * ```
      */
     (/** - Express' request object. */ request: express.Request, /** - Express' response object. */ response: express.Response): Promise<PHPData>;
@@ -276,10 +276,10 @@ type Compile = {
      * 
      * ### Example #1:
      * ```js
-     * const php_cmd = require('express-php-middleware');
+     * const php_cmd = require('http-php');
      * const file_php = php_cmd('path/to/file.php');
      * 
-     * app.get('/path', async (req, res) => {
+     * app.all('/path', async (req, res) => {
      *    let { body: page } = await file_php(req);
      *    // Do something with page
      *    res.send(page);
@@ -288,7 +288,7 @@ type Compile = {
      * 
      * ### Example #2:
      * ```js
-     * app.post('/path', require('express-php-middleware')('path/to/file.php'));
+     * app.all('/path', require('http-php')('path/to/file.php'));
      * ```
      */
     (/** - Path to the PHP file which will be passed to compiler. */ path: string): Execute;
@@ -298,7 +298,7 @@ type Compile = {
      * 
      * ### Example #1:
      * ```js
-     * const php_cmd = require('express-php-middleware');
+     * const php_cmd = require('http-php');
      * const file_php = php_cmd({
      *    file: 'path/to/file.php',
      *    cwd: 'other/directory/',
@@ -307,7 +307,7 @@ type Compile = {
      *    }
      * });
      * 
-     * app.get('/path', async (req, res) => {
+     * app.all('/path', async (req, res) => {
      *    let { body: page } = await file_php(req);
      *    // Do something with page
      *    res.send(page);
@@ -316,7 +316,7 @@ type Compile = {
      * 
      * ### Example #2:
      * ```js
-     * app.post('/path', require('express-php-middleware')({ file: 'path/to/file.php' }));
+     * app.all('/path', require('http-php')({ file: 'path/to/file.php' }));
      * ```
      */
     (/** - Compilation options. `file` property must be specified. */ options: Options): Execute;
