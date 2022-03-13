@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import fs = require('fs');
-import express = require('express');
+import http = require('http');
 interface Environment {
     /**
      * For security reasons, by default CGI compiler blocks all direct executions. To execute it properly request must be redirected by server. Redirect status is the request status passed to PHP compiler. Similarly to Express, 200 is 'OK', 404 - 'Not Found' and 500 - 'Internal Server Error'.
@@ -207,7 +207,7 @@ declare type PHPData = {
      */
     raw: string;
 };
-declare type Execute = {
+interface Execute {
     /**
      * Request handler.
      *
@@ -222,18 +222,20 @@ declare type Execute = {
      *    res.send(page);
      * });
      * ```
-     */
-    (/** - Express' request object. */ request: express.Request): Promise<PHPData>;
-    /**
-     * If `res` parameter is passed, will automatically respond with `text/html` generated from request.
+     *
+     * If `res` parameter is passed, will automatically respond with generated data.
      *
      * ### Example:
      * ```js
      * app.all('/path', require('http-php')('path/to/file.php'));
      * ```
      */
-    (/** - Express' request object. */ request: express.Request, /** - Express' response object. */ response: express.Response): Promise<PHPData>;
-};
+    (/** - Request object. */ request: http.IncomingMessage, /** - Response object. */ response?: http.ServerResponse): Promise<PHPData>;
+    /**
+     * Synchronous version of request handler.
+     */
+    sync: (/** - Request object. */ request: http.IncomingMessage, /** - Response object. */ response?: http.ServerResponse) => PHPData;
+}
 declare type Compile = {
     /**
      * Creates a PHP compiler process.

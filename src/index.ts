@@ -241,7 +241,7 @@ type PHPData = {
     raw: string
 }
 
-type Execute = {
+interface Execute {
     /**
      * Request handler.
      * 
@@ -256,18 +256,20 @@ type Execute = {
      *    res.send(page);
      * });
      * ```
-     */
-    (/** - Express' request object. */ request: express.Request): Promise<PHPData>;
-
-    /**
-     * If `res` parameter is passed, will automatically respond with `text/html` generated from request.
+     * 
+     * If `res` parameter is passed, will automatically respond with generated data.
      * 
      * ### Example:
      * ```js
      * app.all('/path', require('http-php')('path/to/file.php'));
      * ```
      */
-    (/** - Express' request object. */ request: express.Request, /** - Express' response object. */ response: express.Response): Promise<PHPData>;
+    (/** - Request object. */ request: http.IncomingMessage, /** - Response object. */ response?: http.ServerResponse): Promise<PHPData>;
+
+    /**
+     * Synchronous version of request handler.
+     */
+    sync: (/** - Request object. */ request: http.IncomingMessage, /** - Response object. */ response?: http.ServerResponse) => PHPData;
 }
 
 type Compile = {
@@ -333,65 +335,73 @@ const compile: Compile = (arg: string | Options) => {
 
     if (!file || !fs.existsSync(file)) throw new Error('PHP file path is incorrect {options->file | path}')
 
-    return (req: http.IncomingMessage | express.Request, res?: http.ServerResponse): Promise<PHPData> => {
+    const prepArg = (req: http.IncomingMessage | express.Request) => {
+        let CONTENT_TYPE = <string>req.headers['content-type']
+        let CONTENT_LENGTH = <string>req.headers['content-length']
+        let input: (Buffer | null) = null
+        if (!req.readable && 'body' in req) {
+            if (typeof req.body === 'string') input = Buffer.from(req.body)
+            else if (req.body instanceof Buffer) input = req.body
+            else if (typeof req.body === 'object' && Object.getOwnPropertyNames(req.body).length) {
+                if (req.is('application/x-www-form-urlencoded')) {
+                    input = Buffer.from(Object.entries(req.body).map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(<number | string>v)).join('&').replace(/%20/g, '+'))
+                } else {
+                    input = Buffer.from(JSON.stringify(req.body))
+                    CONTENT_TYPE = 'application/json'
+                }
+                CONTENT_LENGTH = input.length.toString()
+            }
+        }
+
+        const env = {
+            SCRIPT_FILENAME: file.toString(),
+            REDIRECT_STATUS: (<Options>arg).env?.REDIRECT_STATUS?.toString() ?? '200',
+            AUTH_TYPE: (<Options>arg).env?.AUTH_TYPE,
+            CONTENT_LENGTH: (<Options>arg).env?.CONTENT_LENGTH?.toString() ?? CONTENT_LENGTH,
+            CONTENT_TYPE: (<Options>arg).env?.CONTENT_TYPE ?? CONTENT_TYPE,
+            GATEWAY_INTERFACE: (<Options>arg).env?.GATEWAY_INTERFACE ?? 'CGI/1.1',
+            HTTPS: (<Options>arg).env?.HTTPS ?? ('encrypted' in req.socket ? 'On' : undefined),
+            PATH_INFO: (<Options>arg).env?.PATH_INFO ?? req.url?.replace(/\?.*?/, ''),
+            PATH_TRANSLATED: (<Options>arg).env?.PATH_TRANSLATED ?? file.toString(),
+            QUERY_STRING: req.url?.includes('?') ? req.url?.replace(/.*?\?/, '') : '',
+            REMOTE_ADDR: (<Options>arg).env?.REMOTE_ADDR ?? <string>req.headers['cf-connecting-ip'] ?? req.headers.forwarded?.split(',')[0],
+            REMOTE_HOST: (<Options>arg).env?.REMOTE_HOST,
+            REMOTE_IDENT: (<Options>arg).env?.REMOTE_IDENT,
+            REMOTE_USER: (<Options>arg).env?.REMOTE_USER,
+            REQUEST_METHOD: (<Options>arg).env?.REQUEST_METHOD ?? req.method,
+            SERVER_ADDR: (<Options>arg).env?.SERVER_ADDR ?? req.socket.localAddress,
+            SERVER_NAME: (<Options>arg).env?.SERVER_NAME ?? req.headers.host,
+            SERVER_PORT: (<Options>arg).env?.SERVER_PORT?.toString() ?? req.socket.localPort?.toString(),
+            SERVER_PROTOCOL: (<Options>arg).env?.SERVER_PROTOCOL ?? ('HTTP/' + req.httpVersion),
+            SERVER_SOFTWARE: (<Options>arg).env?.SERVER_SOFTWARE ?? 'Express'
+        }
+
+        const headers: {[i:string]:string} = {}
+
+        for (const name in req.headers) {
+            let header = req.headers[name]
+
+            if (typeof header === 'object' || header === undefined) continue
+
+            headers['HTTP_' + name.toUpperCase().replace(/-/g, '_')] = header
+        }
+
+        Object.assign(env, headers)
+
+        for (const name in (<Options>arg).env) {
+            if (name.startsWith('HTTP_')) env[<'HTTPS'>name] = (<Options>arg).env?.[<'HTTPS'>name]
+        }
+
+        return {
+            env,
+            input
+        }
+    }
+
+    const exec: Execute = (req: http.IncomingMessage, res?: http.ServerResponse): Promise<PHPData> => {
+        const { env, input } = prepArg(req)
         
         return new Promise((resolve, reject) => {
-            let CONTENT_TYPE = <string>req.headers['content-type']
-            let CONTENT_LENGTH = <string>req.headers['content-length']
-            let body: (Buffer | null) = null
-            if (!req.readable && 'body' in req) {
-                if (typeof req.body === 'string') body = Buffer.from(req.body)
-                else if (req.body instanceof Buffer) body = req.body
-                else if (typeof req.body === 'object' && Object.getOwnPropertyNames(req.body).length) {
-                    if (req.is('application/x-www-form-urlencoded')) {
-                        body = Buffer.from(Object.entries(req.body).map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(<number | string>v)).join('&').replace(/%20/g, '+'))
-                    } else {
-                        body = Buffer.from(JSON.stringify(req.body))
-                        CONTENT_TYPE = 'application/json'
-                    }
-                    CONTENT_LENGTH = body.length.toString()
-                }
-            }
-
-            const env = {
-                SCRIPT_FILENAME: file.toString(),
-                REDIRECT_STATUS: (<Options>arg).env?.REDIRECT_STATUS?.toString() ?? '200',
-                AUTH_TYPE: (<Options>arg).env?.AUTH_TYPE,
-                CONTENT_LENGTH: (<Options>arg).env?.CONTENT_LENGTH?.toString() ?? CONTENT_LENGTH,
-                CONTENT_TYPE: (<Options>arg).env?.CONTENT_TYPE ?? CONTENT_TYPE,
-                GATEWAY_INTERFACE: (<Options>arg).env?.GATEWAY_INTERFACE ?? 'CGI/1.1',
-                HTTPS: (<Options>arg).env?.HTTPS ?? ('encrypted' in req.socket ? 'On' : undefined),
-                PATH_INFO: (<Options>arg).env?.PATH_INFO ?? req.url?.replace(/\?.*?/, ''),
-                PATH_TRANSLATED: (<Options>arg).env?.PATH_TRANSLATED ?? file.toString(),
-                QUERY_STRING: req.url?.includes('?') ? req.url?.replace(/.*?\?/, '') : '',
-                REMOTE_ADDR: (<Options>arg).env?.REMOTE_ADDR ?? <string>req.headers['cf-connecting-ip'] ?? req.headers.forwarded?.split(',')[0],
-                REMOTE_HOST: (<Options>arg).env?.REMOTE_HOST,
-                REMOTE_IDENT: (<Options>arg).env?.REMOTE_IDENT,
-                REMOTE_USER: (<Options>arg).env?.REMOTE_USER,
-                REQUEST_METHOD: (<Options>arg).env?.REQUEST_METHOD ?? req.method,
-                SERVER_ADDR: (<Options>arg).env?.SERVER_ADDR ?? req.socket.localAddress,
-                SERVER_NAME: (<Options>arg).env?.SERVER_NAME ?? req.headers.host,
-                SERVER_PORT: (<Options>arg).env?.SERVER_PORT?.toString() ?? req.socket.localPort?.toString(),
-                SERVER_PROTOCOL: (<Options>arg).env?.SERVER_PROTOCOL ?? ('HTTP/' + req.httpVersion),
-                SERVER_SOFTWARE: (<Options>arg).env?.SERVER_SOFTWARE ?? 'Express'
-            }
-
-            const headers: {[i:string]:string} = {}
-
-            for (const name in req.headers) {
-                let header = req.headers[name]
-
-                if (typeof header === 'object' || header === undefined) continue
-
-                headers['HTTP_' + name.toUpperCase().replace(/-/g, '_')] = header
-            }
-
-            Object.assign(env, headers)
-
-            for (const name in (<Options>arg).env) {
-                if (name.startsWith('HTTP_')) env[<'HTTPS'>name] = (<Options>arg).env?.[<'HTTPS'>name]
-            }
-
             const proc = child.spawn(php, {
                 cwd: (<Options>arg).cwd?.toString(),
                 signal: (<Options>arg).abort,
@@ -399,7 +409,7 @@ const compile: Compile = (arg: string | Options) => {
                 env
             })
             
-            proc.stdout.setEncoding('utf-8')
+            proc.stdout.setEncoding('utf8')
 
             proc.on('error', reject)
             
@@ -420,10 +430,42 @@ const compile: Compile = (arg: string | Options) => {
                 resolve({ headers, body, raw })
             })
             
-            if (body) proc.stdin.write(body)
+            if (input) proc.stdin.write(input)
             else req.pipe(proc.stdin, { end: true })
         })
     }
+
+    exec.sync = (req: http.IncomingMessage, res?: http.ServerResponse): PHPData => {
+        const { env, input } = prepArg(req)
+
+        const proc = child.spawnSync(php, {
+            cwd: (<Options>arg).cwd?.toString(),
+            signal: (<Options>arg).abort,
+            timeout: (<Options>arg).timeout ?? 0,
+            env,
+            encoding: 'utf8',
+            input: <Buffer>input
+        })
+
+        if (proc.error) throw proc.error
+
+        const raw = proc.stdout.toString().replace(/\r\n/g, '\n')
+        const arr = raw.match(/(.*?)\n\n(.*)/s)?.slice(1) ?? ['', '']
+        const headers = Object.fromEntries(arr[0].split('\n').map(val => val.match(/(.*?): (.*)/)?.slice(1) ?? ['err', 'Parsing failed']))
+        const body = arr[1]
+        if (res) {
+            if (headers['Status']) {
+                const code = +headers['Status'].split(' ')[0]
+                if (code == 500) throw new Error('Failed to compile PHP file')
+                res.statusCode = code
+            }
+            res.writeHead(200, headers).end(body)
+        }
+
+        return { headers, body, raw }
+    }
+
+    return exec
 }
 
 
