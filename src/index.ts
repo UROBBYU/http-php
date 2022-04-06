@@ -164,12 +164,14 @@ type Options = {
      * *But compiler will obviously prefer your input to automatically generated.*
      */
     env?: Environment;
+
     /**
      * Path to the PHP file which will be passed to compiler.
      * 
      * **You must specify it.**
      */
     file: fs.PathLike;
+
     /**
      * Path to the PHP compiler.
      * 
@@ -178,14 +180,17 @@ type Options = {
      * **Default: `php-cgi`.**
      */
     php?: fs.PathLike;
+
     /**
      * Current working directory of the compiler process.
      */
     cwd?: fs.PathLike;
+
     /**
      * Allows aborting the compiler process using an AbortSignal.
      */
     abort?: AbortSignal;
+
     /**
      * In milliseconds the maximum amount of time the process is allowed to run.
      * 
@@ -402,6 +407,8 @@ const compile: Compile = (arg: string | Options) => {
         const { env, input } = prepArg(req)
         
         return new Promise((resolve, reject) => {
+            const bufferList: Buffer[] = []
+
             const proc = child.spawn(php, {
                 cwd: (<Options>arg).cwd?.toString(),
                 signal: (<Options>arg).abort,
@@ -412,10 +419,12 @@ const compile: Compile = (arg: string | Options) => {
             proc.stdout.setEncoding('utf8')
 
             proc.on('error', reject)
-            
-            proc.stdout.once('data', (data: Buffer | string) => {
+
+            proc.stdout.on('data', (data: Buffer) => bufferList.push(Buffer.from(data)))
+
+            proc.stdout.once('end', () => {
                 proc.kill()
-                const raw = data.toString().replace(/\r\n/g, '\n')
+                const raw = Buffer.concat(bufferList).toString().replace(/\r\n/g, '\n')
                 const arr = raw.match(/(.*?)\n\n(.*)/s)?.slice(1) ?? ['', '']
                 const headers = Object.fromEntries(arr[0].split('\n').map(val => val.match(/(.*?): (.*)/)?.slice(1) ?? ['err', 'Parsing failed']))
                 const body = arr[1]

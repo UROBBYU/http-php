@@ -82,6 +82,7 @@ const compile = (arg) => {
     const exec = (req, res) => {
         const { env, input } = prepArg(req);
         return new Promise((resolve, reject) => {
+            const bufferList = [];
             const proc = child.spawn(php, {
                 cwd: arg.cwd?.toString(),
                 signal: arg.abort,
@@ -90,9 +91,10 @@ const compile = (arg) => {
             });
             proc.stdout.setEncoding('utf8');
             proc.on('error', reject);
-            proc.stdout.once('data', (data) => {
+            proc.stdout.on('data', (data) => bufferList.push(Buffer.from(data)));
+            proc.stdout.once('end', () => {
                 proc.kill();
-                const raw = data.toString().replace(/\r\n/g, '\n');
+                const raw = Buffer.concat(bufferList).toString().replace(/\r\n/g, '\n');
                 const arr = raw.match(/(.*?)\n\n(.*)/s)?.slice(1) ?? ['', ''];
                 const headers = Object.fromEntries(arr[0].split('\n').map(val => val.match(/(.*?): (.*)/)?.slice(1) ?? ['err', 'Parsing failed']));
                 const body = arr[1];

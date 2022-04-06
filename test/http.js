@@ -10,7 +10,7 @@ module.exports = () => http.request({
         'Key': 4
     }
 })
-.on('error', err => console.err('There was an error:\n' + err.message))
+.on('error', err => console.error('There was an error:\n' + err.message))
 .once('response', res => 
     res.on('data', data => {
         data = data.toString()
