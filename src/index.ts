@@ -484,9 +484,7 @@ const compile: Compile = (arg: string | Options) => {
             input: <Buffer>input
         })
 
-        if (proc.error) throw new Error('Failed to compile PHP file', {
-            cause: proc.error
-        })
+        if (proc.error) throw proc.error
 
         const err = proc.stderr.toString().replace(/\r\n/g, '\n')
         const raw = proc.stdout.toString().replace(/\r\n/g, '\n')
@@ -496,7 +494,9 @@ const compile: Compile = (arg: string | Options) => {
         if (res) {
             if (headers['Status']) {
                 const code = +headers['Status'].split(' ')[0]
-                if (code == 500) throw new Error('Failed to compile PHP file')
+                if (code == 500) throw new Error('Failed to compile PHP file', {
+                    cause: proc.error
+                })
                 res.statusCode = code
             }
             res.writeHead(200, headers).end(body)
