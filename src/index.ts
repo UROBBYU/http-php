@@ -219,6 +219,7 @@ type PHPData = {
     headers: {
         [title: string]: string
     },
+
     /**
      * Response body.
      * 
@@ -230,6 +231,7 @@ type PHPData = {
      * ```
      */
     body: string,
+
     /**
      * Raw response from the compiler. Looks like headers + body, separated by empty line.
      * 
@@ -243,7 +245,25 @@ type PHPData = {
      * </html>
      * ```
      */
-    raw: string
+    raw: string,
+
+    /**
+     * Error stream output. Can contain some debug data even if no error was thrown.
+     * 
+     * ### Example with debug data:
+     * ```
+     * Xdebug: [Step Debug] Time-out connecting to debugging client, waited: 200 ms. Tried: localhost:9003 (through xdebug.client_host/xdebug.client_port) :-(
+     * ```
+     * 
+     * ### Example with error data:
+     * ```
+     * PHP Fatal error:  Uncaught Error: Undefined constant "itDoesNotExist" in D:\Some\path\here.php:1
+     * Stack trace:
+     * #0 {main}
+     *   thrown in D:\Some\path\here.php on line 1
+     * ```
+     */
+    err: string
 }
 
 interface Execute {
@@ -407,7 +427,8 @@ const compile: Compile = (arg: string | Options) => {
         const { env, input } = prepArg(req)
         
         return new Promise((resolve, reject) => {
-            const bufferList: Buffer[] = []
+            const errBufferList: Buffer[] = []
+            const outBufferList: Buffer[] = []
 
             const proc = child.spawn(php, {
                 cwd: (<Options>arg).cwd?.toString(),
@@ -415,28 +436,35 @@ const compile: Compile = (arg: string | Options) => {
                 timeout: (<Options>arg).timeout ?? 0,
                 env
             })
-            
-            proc.stdout.setEncoding('utf8')
 
             proc.on('error', reject)
+            
+            proc.stderr.setEncoding('utf8')
+            proc.stdout.setEncoding('utf8')
 
-            proc.stdout.on('data', (data: Buffer) => bufferList.push(Buffer.from(data)))
-
+            proc.stderr.on('data', (data: Buffer) => errBufferList.push(Buffer.from(data)))
             proc.stdout.once('end', () => {
-                proc.kill()
-                const raw = Buffer.concat(bufferList).toString().replace(/\r\n/g, '\n')
-                const arr = raw.match(/(.*?)\n\n(.*)/s)?.slice(1) ?? ['', '']
-                const headers = Object.fromEntries(arr[0].split('\n').map(val => val.match(/(.*?): (.*)/)?.slice(1) ?? ['err', 'Parsing failed']))
-                const body = arr[1]
-                if (res) {
-                    if (headers['Status']) {
-                        const code = +headers['Status'].split(' ')[0]
-                        if (code == 500) return reject(new Error('Failed to compile PHP file'))
-                        res.statusCode = code
+                const err = Buffer.concat(outBufferList).toString().replace(/\r\n/g, '\n')
+
+                proc.stdout.on('data', (data: Buffer) => outBufferList.push(Buffer.from(data)))
+                proc.stdout.once('end', () => {
+                    proc.kill()
+                    const raw = Buffer.concat(outBufferList).toString().replace(/\r\n/g, '\n')
+                    const arr = raw.match(/(.*?)\n\n(.*)/s)?.slice(1) ?? ['', '']
+                    const headers = Object.fromEntries(arr[0].split('\n').map(val => val.match(/(.*?): (.*)/)?.slice(1) ?? ['err', 'Parsing failed']))
+                    const body = arr[1]
+                    if (res) {
+                        if (headers['Status']) {
+                            const code = +headers['Status'].split(' ')[0]
+                            if (code == 500) return reject(new Error('Failed to compile PHP file', {
+                                cause: new Error(err)
+                            }))
+                            res.statusCode = code
+                        }
+                        res.writeHead(200, headers).end(body)
                     }
-                    res.writeHead(200, headers).end(body)
-                }
-                resolve({ headers, body, raw })
+                    resolve({ headers, body, raw, err })
+                })
             })
             
             if (input) proc.stdin.write(input)
@@ -456,8 +484,11 @@ const compile: Compile = (arg: string | Options) => {
             input: <Buffer>input
         })
 
-        if (proc.error) throw proc.error
+        if (proc.error) throw new Error('Failed to compile PHP file', {
+            cause: proc.error
+        })
 
+        const err = proc.stderr.toString().replace(/\r\n/g, '\n')
         const raw = proc.stdout.toString().replace(/\r\n/g, '\n')
         const arr = raw.match(/(.*?)\n\n(.*)/s)?.slice(1) ?? ['', '']
         const headers = Object.fromEntries(arr[0].split('\n').map(val => val.match(/(.*?): (.*)/)?.slice(1) ?? ['err', 'Parsing failed']))
@@ -471,7 +502,7 @@ const compile: Compile = (arg: string | Options) => {
             res.writeHead(200, headers).end(body)
         }
 
-        return { headers, body, raw }
+        return { headers, body, raw, err }
     }
 
     return exec
