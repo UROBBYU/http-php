@@ -82,32 +82,38 @@ const compile = (arg) => {
     const exec = (req, res) => {
         const { env, input } = prepArg(req);
         return new Promise((resolve, reject) => {
-            const bufferList = [];
+            const errBufferList = [];
+            const outBufferList = [];
             const proc = child.spawn(php, {
                 cwd: arg.cwd?.toString(),
                 signal: arg.abort,
                 timeout: arg.timeout ?? 0,
                 env
             });
-            proc.stdout.setEncoding('utf8');
             proc.on('error', reject);
-            proc.stdout.on('data', (data) => bufferList.push(Buffer.from(data)));
-            proc.stdout.once('end', () => {
-                proc.kill();
-                const raw = Buffer.concat(bufferList).toString().replace(/\r\n/g, '\n');
-                const arr = raw.match(/(.*?)\n\n(.*)/s)?.slice(1) ?? ['', ''];
-                const headers = Object.fromEntries(arr[0].split('\n').map(val => val.match(/(.*?): (.*)/)?.slice(1) ?? ['err', 'Parsing failed']));
-                const body = arr[1];
-                if (res) {
-                    if (headers['Status']) {
-                        const code = +headers['Status'].split(' ')[0];
-                        if (code == 500)
-                            return reject(new Error('Failed to compile PHP file'));
-                        res.statusCode = code;
+            proc.stderr.setEncoding('utf8');
+            proc.stdout.setEncoding('utf8');
+            proc.stderr.on('data', (data) => errBufferList.push(Buffer.from(data)));
+            proc.stderr.once('end', () => {
+                const err = Buffer.concat(errBufferList).toString().replace(/\r\n/g, '\n');
+                proc.stdout.on('data', (data) => outBufferList.push(Buffer.from(data)));
+                proc.stdout.once('end', () => {
+                    proc.kill();
+                    const raw = Buffer.concat(outBufferList).toString().replace(/\r\n/g, '\n');
+                    const arr = raw.match(/(.*?)\n\n(.*)/s)?.slice(1) ?? ['', ''];
+                    const headers = Object.fromEntries(arr[0].split('\n').map(val => val.match(/(.*?): (.*)/)?.slice(1) ?? ['err', 'Parsing failed']));
+                    const body = arr[1];
+                    if (res) {
+                        if (headers['Status']) {
+                            const code = +headers['Status'].split(' ')[0];
+                            if (code == 500)
+                                return reject(new Error('Failed to compile PHP file:\n' + err));
+                            res.statusCode = code;
+                        }
+                        res.writeHead(200, headers).end(body);
                     }
-                    res.writeHead(200, headers).end(body);
-                }
-                resolve({ headers, body, raw });
+                    resolve({ headers, body, raw, err });
+                });
             });
             if (input)
                 proc.stdin.write(input);
@@ -127,6 +133,7 @@ const compile = (arg) => {
         });
         if (proc.error)
             throw proc.error;
+        const err = proc.stderr.toString().replace(/\r\n/g, '\n');
         const raw = proc.stdout.toString().replace(/\r\n/g, '\n');
         const arr = raw.match(/(.*?)\n\n(.*)/s)?.slice(1) ?? ['', ''];
         const headers = Object.fromEntries(arr[0].split('\n').map(val => val.match(/(.*?): (.*)/)?.slice(1) ?? ['err', 'Parsing failed']));
@@ -135,12 +142,12 @@ const compile = (arg) => {
             if (headers['Status']) {
                 const code = +headers['Status'].split(' ')[0];
                 if (code == 500)
-                    throw new Error('Failed to compile PHP file');
+                    throw new Error('Failed to compile PHP file:\n' + err);
                 res.statusCode = code;
             }
             res.writeHead(200, headers).end(body);
         }
-        return { headers, body, raw };
+        return { headers, body, raw, err };
     };
     return exec;
 };

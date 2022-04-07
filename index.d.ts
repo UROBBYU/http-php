@@ -206,6 +206,23 @@ declare type PHPData = {
      * ```
      */
     raw: string;
+    /**
+     * Error stream output. Can contain some debug data even if no error was thrown.
+     *
+     * ### Example with debug data:
+     * ```cmd
+     * Xdebug: [Step Debug] Time-out connecting to debugging client, waited: 200 ms. Tried: localhost:9003 (through xdebug.client_host/xdebug.client_port) :-(
+     * ```
+     *
+     * ### Example with error data:
+     * ```cmd
+     * PHP Fatal error:  Uncaught Error: Undefined constant "itDoesNotExist" in D:\Some\path\here.php:1
+     * Stack trace:
+     * #0 {main}
+     *   thrown in D:\Some\path\here.php on line 1
+     * ```
+     */
+    err: string;
 };
 interface Execute {
     /**
