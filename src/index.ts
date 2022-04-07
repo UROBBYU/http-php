@@ -251,12 +251,12 @@ type PHPData = {
      * Error stream output. Can contain some debug data even if no error was thrown.
      * 
      * ### Example with debug data:
-     * ```
+     * ```cmd
      * Xdebug: [Step Debug] Time-out connecting to debugging client, waited: 200 ms. Tried: localhost:9003 (through xdebug.client_host/xdebug.client_port) :-(
      * ```
      * 
      * ### Example with error data:
-     * ```
+     * ```cmd
      * PHP Fatal error:  Uncaught Error: Undefined constant "itDoesNotExist" in D:\Some\path\here.php:1
      * Stack trace:
      * #0 {main}
@@ -443,8 +443,8 @@ const compile: Compile = (arg: string | Options) => {
             proc.stdout.setEncoding('utf8')
 
             proc.stderr.on('data', (data: Buffer) => errBufferList.push(Buffer.from(data)))
-            proc.stdout.once('end', () => {
-                const err = Buffer.concat(outBufferList).toString().replace(/\r\n/g, '\n')
+            proc.stderr.once('end', () => {
+                const err = Buffer.concat(errBufferList).toString().replace(/\r\n/g, '\n')
 
                 proc.stdout.on('data', (data: Buffer) => outBufferList.push(Buffer.from(data)))
                 proc.stdout.once('end', () => {
@@ -456,9 +456,7 @@ const compile: Compile = (arg: string | Options) => {
                     if (res) {
                         if (headers['Status']) {
                             const code = +headers['Status'].split(' ')[0]
-                            if (code == 500) return reject(new Error('Failed to compile PHP file', {
-                                cause: new Error(err)
-                            }))
+                            if (code == 500) return reject(new Error('Failed to compile PHP file:\n' + err))
                             res.statusCode = code
                         }
                         res.writeHead(200, headers).end(body)
@@ -494,9 +492,7 @@ const compile: Compile = (arg: string | Options) => {
         if (res) {
             if (headers['Status']) {
                 const code = +headers['Status'].split(' ')[0]
-                if (code == 500) throw new Error('Failed to compile PHP file', {
-                    cause: proc.error
-                })
+                if (code == 500) throw new Error('Failed to compile PHP file:\n' + err)
                 res.statusCode = code
             }
             res.writeHead(200, headers).end(body)
