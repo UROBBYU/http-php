@@ -41,6 +41,7 @@ const compile = (arg) => {
             }
         }
         const env = {
+            ARGS: arg.env?.ARGS,
             SCRIPT_FILENAME: file.toString(),
             REDIRECT_STATUS: arg.env?.REDIRECT_STATUS?.toString() ?? '200',
             AUTH_TYPE: arg.env?.AUTH_TYPE,

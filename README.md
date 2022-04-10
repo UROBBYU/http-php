@@ -4,7 +4,16 @@
 [![install size](https://badgen.net/packagephobia/install/http-php?color=yellow&icon=packagephobia)](https://packagephobia.com/result?p=http-php)
 ![types](https://badgen.net/npm/types/http-php?color=green&icon=typescript)
 
-This module uses PHP CGI to compile file output. It also accepts parsed request bodies and returns body with headers. Cookies and custom headers are also supported.
+This module uses PHP CGI to compile file output.
+
+## Features
+
+- Accepts parsed request bodies;
+- Returns response body, headers and error output separately;
+- Supports cookies and custom headers;
+- You can pass custom args as env variable.
+
+More explanations in JSDoc.
 
 ## Installation
 
@@ -14,7 +23,7 @@ You can install it with [npm](https://www.npmjs.com/):
 npm i http-php
 ```
 
-You also need PHP to be already [installed](https://www.php.net/install) and preferably [configured](https://www.php.net/manual/en/faq.installation.php#faq.installation.addtopath) in the `PATH`.
+You also need PHP-CGI to be already [installed](https://www.php.net/install) and preferably [configured](https://www.php.net/manual/en/faq.installation.php#faq.installation.addtopath) in the `PATH`.
 
 ## Usage
 
@@ -40,7 +49,10 @@ const file_php = php({
     abort: someAbortSignal, // (Optional) AbortSignal which can stop compilation process
     timeout: 500, // (Optional) In milliseconds the maximum amount of time the process is allowed to run
     env: { // (Optional) PHP Environment variables
-        REDIRECT_STATUS: 201
+        ARGS: JSON.stringify({
+            arg1: 'Ohayo ',
+            arg2: 'Sekai!'
+        })
         // ... there are more variables explained in JSDoc
     }
 });

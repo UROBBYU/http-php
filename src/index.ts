@@ -15,6 +15,23 @@ import cmdEx from 'command-exists'
 
 interface Environment {
     /**
+     * Custom environment variable for multipurpose use. You can pass here some variables or JSON-encoded string and then read it from PHP.
+     * 
+     * ### Example:
+     * ```js
+     * ARGS: '{"arg1":"Ohayo ","arg2":"sekai!"}'
+     * ```
+     * ```php
+     * <?php
+     * $args = json_decode($_SERVER['ARGS']);
+     * echo $args->arg1, $args->arg2; # Ohayo sekai!
+     * ```
+     * 
+     * **Omitted.**
+     */
+    ARGS?: string;
+
+    /**
      * For security reasons, by default CGI compiler blocks all direct executions. To execute it properly request must be redirected by server. Redirect status is the request status passed to PHP compiler. Similarly to Express, 200 is 'OK', 404 - 'Not Found' and 500 - 'Internal Server Error'.
      * 
      * **Default: `200`.**
@@ -379,6 +396,7 @@ const compile: Compile = (arg: string | Options) => {
         }
 
         const env = {
+            ARGS: (<Options>arg).env?.ARGS,
             SCRIPT_FILENAME: file.toString(),
             REDIRECT_STATUS: (<Options>arg).env?.REDIRECT_STATUS?.toString() ?? '200',
             AUTH_TYPE: (<Options>arg).env?.AUTH_TYPE,
