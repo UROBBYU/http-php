@@ -40,22 +40,28 @@ const compile = (arg) => {
                 CONTENT_LENGTH = input.length.toString();
             }
         }
+        const route = (req.originalUrl ? req.originalUrl?.slice(0, -req.url.length) : arg.route) ?? '/';
+        const queryString = req.url?.includes('?') ? req.url?.replace(/.*?\?/, '') : '';
+        const pathInfo = (req.originalUrl ?? req.url).slice(route.length, (queryString ? -queryString.length - 1 : undefined));
         const env = {
             ARGS: arg.env?.ARGS,
+            SCRIPT_NAME: arg.env?.SCRIPT_NAME ?? route + '/index.php',
             SCRIPT_FILENAME: file.toString(),
+            PHP_SELF: arg.env?.PHP_SELF ?? route + '/index.php' + pathInfo,
             REDIRECT_STATUS: arg.env?.REDIRECT_STATUS?.toString() ?? '200',
             AUTH_TYPE: arg.env?.AUTH_TYPE,
             CONTENT_LENGTH: arg.env?.CONTENT_LENGTH?.toString() ?? CONTENT_LENGTH,
             CONTENT_TYPE: arg.env?.CONTENT_TYPE ?? CONTENT_TYPE,
             GATEWAY_INTERFACE: arg.env?.GATEWAY_INTERFACE ?? 'CGI/1.1',
             HTTPS: arg.env?.HTTPS ?? ('encrypted' in req.socket ? 'On' : undefined),
-            PATH_INFO: arg.env?.PATH_INFO ?? req.url?.replace(/\?.*?/, ''),
+            PATH_INFO: arg.env?.PATH_INFO ?? pathInfo,
             PATH_TRANSLATED: arg.env?.PATH_TRANSLATED ?? file.toString(),
-            QUERY_STRING: req.url?.includes('?') ? req.url?.replace(/.*?\?/, '') : '',
+            QUERY_STRING: queryString,
             REMOTE_ADDR: arg.env?.REMOTE_ADDR ?? req.headers['cf-connecting-ip'] ?? req.headers.forwarded?.split(',')[0],
             REMOTE_HOST: arg.env?.REMOTE_HOST,
             REMOTE_IDENT: arg.env?.REMOTE_IDENT,
             REMOTE_USER: arg.env?.REMOTE_USER,
+            REQUEST_URI: arg.env?.REQUEST_URI ?? req.originalUrl ?? req.url,
             REQUEST_METHOD: arg.env?.REQUEST_METHOD ?? req.method,
             SERVER_ADDR: arg.env?.SERVER_ADDR ?? req.socket.localAddress,
             SERVER_NAME: arg.env?.SERVER_NAME ?? req.headers.host,

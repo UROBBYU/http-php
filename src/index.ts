@@ -130,6 +130,27 @@ interface Environment {
     REMOTE_USER?: string;
 
     /**
+     * Full request URI path with query string at the end.
+     * 
+     * **Evaluated automatically.**
+     */
+    REQUEST_URI?: string;
+
+    /**
+     * URI route with index.php chained to the end.
+     * 
+     * **Evaluated automatically.**
+     */
+    SCRIPT_NAME?: string;
+
+    /**
+     * SCRIPT_NAME + PATH_INFO.
+     * 
+     * **Evaluated automatically.**
+     */
+    PHP_SELF?: string;
+
+    /**
      * The REQUEST_METHOD variable gives the type of HTTP request completed, which includes values like GET, POST, and PUT.
      * 
      * **Evaluated automatically.**
@@ -197,6 +218,13 @@ type Options = {
      * **Default: `php-cgi`.**
      */
     php?: fs.PathLike;
+
+    /**
+     * URI route that precedes a script execution point.
+     * 
+     * For example, if you have `my.domain.com/some/route/and/info` path, which is equal to `my.domain.com/some/route/index.php/and/info`, then `/some/route` part will be your route.
+     */
+    route?: string;
 
     /**
      * Current working directory of the compiler process.
@@ -395,22 +423,29 @@ const compile: Compile = (arg: string | Options) => {
             }
         }
 
+        const route = ((<express.Request>req).originalUrl ? (<express.Request>req).originalUrl?.slice(0, -(<express.Request>req).url.length) : (<Options>arg).route) ?? '/'
+        const queryString = req.url?.includes('?') ? req.url?.replace(/.*?\?/, '') : ''
+        const pathInfo = ((<express.Request>req).originalUrl ?? req.url).slice(route.length, (queryString ? -queryString.length - 1 : undefined))
+
         const env = {
             ARGS: (<Options>arg).env?.ARGS,
+            SCRIPT_NAME: (<Options>arg).env?.SCRIPT_NAME ?? route + '/index.php',
             SCRIPT_FILENAME: file.toString(),
+            PHP_SELF: (<Options>arg).env?.PHP_SELF ?? route + '/index.php' + pathInfo,
             REDIRECT_STATUS: (<Options>arg).env?.REDIRECT_STATUS?.toString() ?? '200',
             AUTH_TYPE: (<Options>arg).env?.AUTH_TYPE,
             CONTENT_LENGTH: (<Options>arg).env?.CONTENT_LENGTH?.toString() ?? CONTENT_LENGTH,
             CONTENT_TYPE: (<Options>arg).env?.CONTENT_TYPE ?? CONTENT_TYPE,
             GATEWAY_INTERFACE: (<Options>arg).env?.GATEWAY_INTERFACE ?? 'CGI/1.1',
             HTTPS: (<Options>arg).env?.HTTPS ?? ('encrypted' in req.socket ? 'On' : undefined),
-            PATH_INFO: (<Options>arg).env?.PATH_INFO ?? req.url?.replace(/\?.*?/, ''),
+            PATH_INFO: (<Options>arg).env?.PATH_INFO ?? pathInfo,
             PATH_TRANSLATED: (<Options>arg).env?.PATH_TRANSLATED ?? file.toString(),
-            QUERY_STRING: req.url?.includes('?') ? req.url?.replace(/.*?\?/, '') : '',
+            QUERY_STRING: queryString,
             REMOTE_ADDR: (<Options>arg).env?.REMOTE_ADDR ?? <string>req.headers['cf-connecting-ip'] ?? req.headers.forwarded?.split(',')[0],
             REMOTE_HOST: (<Options>arg).env?.REMOTE_HOST,
             REMOTE_IDENT: (<Options>arg).env?.REMOTE_IDENT,
             REMOTE_USER: (<Options>arg).env?.REMOTE_USER,
+            REQUEST_URI: (<Options>arg).env?.REQUEST_URI ?? (<express.Request>req).originalUrl ?? req.url,
             REQUEST_METHOD: (<Options>arg).env?.REQUEST_METHOD ?? req.method,
             SERVER_ADDR: (<Options>arg).env?.SERVER_ADDR ?? req.socket.localAddress,
             SERVER_NAME: (<Options>arg).env?.SERVER_NAME ?? req.headers.host,

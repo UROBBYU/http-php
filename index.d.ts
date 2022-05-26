@@ -103,6 +103,24 @@ interface Environment {
      */
     REMOTE_USER?: string;
     /**
+     * Full request URI path with query string at the end.
+     *
+     * **Evaluated automatically.**
+     */
+    REQUEST_URI?: string;
+    /**
+     * URI route with index.php chained to the end.
+     *
+     * **Evaluated automatically.**
+     */
+    SCRIPT_NAME?: string;
+    /**
+     * SCRIPT_NAME + PATH_INFO.
+     *
+     * **Evaluated automatically.**
+     */
+    PHP_SELF?: string;
+    /**
      * The REQUEST_METHOD variable gives the type of HTTP request completed, which includes values like GET, POST, and PUT.
      *
      * **Evaluated automatically.**
@@ -162,6 +180,12 @@ declare type Options = {
      * **Default: `php-cgi`.**
      */
     php?: fs.PathLike;
+    /**
+     * URI route that precedes a script execution point.
+     *
+     * For example, if you have `my.domain.com/some/route/and/info` path, which is equal to `my.domain.com/some/route/index.php/and/info`, then `/some/route` part will be your route.
+     */
+    route?: string;
     /**
      * Current working directory of the compiler process.
      */
